@@ -34,7 +34,36 @@ public class Producer extends Thread {
     private final Boolean isAsync;
     private int numRecords;
     private final CountDownLatch latch;
+    private final int recordSize;
 
+    public Producer(final String topic,
+                    final Boolean isAsync,
+                    final String transactionalId,
+                    final boolean enableIdempotency,
+                    final int numRecords,
+                    final int transactionTimeoutMs,
+                    final CountDownLatch latch,
+                    final int recordSize) {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaProperties.KAFKA_SERVER_URL + ":" + KafkaProperties.KAFKA_SERVER_PORT);
+        props.put(ProducerConfig.CLIENT_ID_CONFIG, "DemoProducer");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        if (transactionTimeoutMs > 0) {
+            props.put(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, transactionTimeoutMs);
+        }
+        if (transactionalId != null) {
+            props.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
+        }
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, enableIdempotency);
+
+        producer = new KafkaProducer<>(props);
+        this.topic = topic;
+        this.isAsync = isAsync;
+        this.numRecords = numRecords;
+        this.latch = latch;
+        this.recordSize = recordSize;
+    }
     public Producer(final String topic,
                     final Boolean isAsync,
                     final String transactionalId,
@@ -60,6 +89,7 @@ public class Producer extends Thread {
         this.isAsync = isAsync;
         this.numRecords = numRecords;
         this.latch = latch;
+        this.recordSize = 100;
     }
 
     KafkaProducer<Integer, String> get() {
@@ -68,10 +98,11 @@ public class Producer extends Thread {
 
     @Override
     public void run() {
+        long startRun = System.nanoTime();
         int messageKey = 0;
         int recordsSent = 0;
         while (recordsSent < numRecords) {
-            String messageStr = "Message_" + messageKey;
+            String messageStr = String.format("%1$"+ this.recordSize + "s", messageKey);
             long startTime = System.currentTimeMillis();
             if (isAsync) { // Send asynchronously
                 producer.send(new ProducerRecord<>(topic,
@@ -82,7 +113,7 @@ public class Producer extends Thread {
                     producer.send(new ProducerRecord<>(topic,
                         messageKey,
                         messageStr)).get();
-                    System.out.println("Sent message: (" + messageKey + ", " + messageStr + ")");
+                    // System.out.println("Sent message: (" + messageKey + ", " + messageStr + ")");
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
                 }
@@ -90,7 +121,11 @@ public class Producer extends Thread {
             messageKey += 2;
             recordsSent += 1;
         }
-        System.out.println("Producer sent " + numRecords + " records successfully");
+        System.out.println(String.format("%1$"+ this.recordSize + "s", messageKey));
+        System.out.println("Producer sent " + recordsSent + " records successfully");
+        long endRun = System.nanoTime();
+        long runtime = endRun - startRun;
+        System.out.println("Elapsed time: " + runtime);
         latch.countDown();
     }
 }
@@ -117,14 +152,16 @@ class DemoCallBack implements Callback {
      * @param exception The exception thrown during processing of this record. Null if no error occurred.
      */
     public void onCompletion(RecordMetadata metadata, Exception exception) {
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        if (metadata != null) {
-            System.out.println(
-                "message(" + key + ", " + message + ") sent to partition(" + metadata.partition() +
-                    "), " +
-                    "offset(" + metadata.offset() + ") in " + elapsedTime + " ms");
-        } else {
+        if (metadata == null)
             exception.printStackTrace();
-        }
+        // long elapsedTime = System.currentTimeMillis() - startTime;
+        // if (metadata != null) {
+        //     System.out.println(
+        //         "message(" + key + ", " + message + ") sent to partition(" + metadata.partition() +
+        //             "), " +
+        //             "offset(" + metadata.offset() + ") in " + elapsedTime + " ms");
+        // } else {
+        //     exception.printStackTrace();
+        // }
     }
 }

@@ -20,6 +20,7 @@ package kafka.server
 import java.lang.{Byte => JByte}
 import java.lang.{Long => JLong}
 import java.nio.ByteBuffer
+import java.io._
 import java.util
 import java.util.{Collections, Optional}
 import java.util.concurrent.ConcurrentHashMap
@@ -119,10 +120,28 @@ class KafkaApis(val requestChannel: RequestChannel,
   this.logIdent = "[KafkaApi-%d] ".format(brokerId)
   val adminZkClient = new AdminZkClient(zkClient)
   private val alterAclsPurgatory = new DelayedFuturePurgatory(purgatoryName = "AlterAcls", brokerId = config.brokerId)
+  private var timeSpentAppending: Long = 0
+  private var timeSpentProducerHandler: Long = 0
+  private var timeSpentFetching: Long = 0
+  private var timeSpentFetchHandler: Long = 0
 
   def close(): Unit = {
     alterAclsPurgatory.shutdown()
     info("Shutdown complete.")
+    val f1 = new PrintWriter(new File("/Users/Tapan/kafka/data/appending_time.txt"))
+    val f2 = new PrintWriter(new File("/Users/Tapan/kafka/data/fetch_time.txt"))
+    val append_str = this.timeSpentAppending.toString() + "," + this.timeSpentProducerHandler.toString() + "\n"
+    val fetch_str =  this.timeSpentFetching.toString()  + "," + this.timeSpentFetchHandler.toString()    + "\n"
+    f1.write(append_str)
+    f2.write(fetch_str)
+    System.out.println("Time spent appending: " + this.timeSpentAppending.toString())
+    System.out.println("Time spent fetching: " + this.timeSpentFetching.toString())
+    System.out.println("Time spent produce handler: " + this.timeSpentProducerHandler.toString())
+    System.out.println("Time spent fetch handler: " + this.timeSpentFetchHandler.toString())
+    f1.flush()
+    f2.flush()
+    f1.close()
+    f2.close()
   }
 
   private def maybeHandleInvalidEnvelope(
@@ -563,6 +582,7 @@ class KafkaApis(val requestChannel: RequestChannel,
    * Handle a produce request
    */
   def handleProduceRequest(request: RequestChannel.Request): Unit = {
+    val startHandler = System.nanoTime()
     val produceRequest = request.body[ProduceRequest]
     val numBytesAppended = request.header.toStruct.sizeOf + request.sizeOfBodyInBytes
 
@@ -673,6 +693,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       val internalTopicsAllowed = request.header.clientId == AdminUtils.AdminClientId
 
       // call the replica manager to append messages to the replicas
+      val start = System.nanoTime()
       replicaManager.appendRecords(
         timeout = produceRequest.timeout.toLong,
         requiredAcks = produceRequest.acks,
@@ -682,6 +703,9 @@ class KafkaApis(val requestChannel: RequestChannel,
         responseCallback = sendResponseCallback,
         recordConversionStatsCallback = processingStatsCallback)
 
+      val end = System.nanoTime()
+      this.timeSpentAppending += (end - start)
+      this.timeSpentProducerHandler += (end - startHandler)
       // if the request is put into the purgatory, it will have a held reference and hence cannot be garbage collected;
       // hence we clear its data here in order to let GC reclaim its memory since it is already appended to log
       produceRequest.clearPartitionRecords()
@@ -692,6 +716,7 @@ class KafkaApis(val requestChannel: RequestChannel,
    * Handle a fetch request
    */
   def handleFetchRequest(request: RequestChannel.Request): Unit = {
+    val startFetch = System.nanoTime()
     val versionId = request.header.apiVersion
     val clientId = request.header.clientId
     val fetchRequest = request.body[FetchRequest]
@@ -940,6 +965,9 @@ class KafkaApis(val requestChannel: RequestChannel,
       processResponseCallback(Seq.empty)
     else {
       // call the replica manager to fetch messages from the local replica
+      // TAPAN: fetch messages
+
+      val start = System.nanoTime()
       replicaManager.fetchMessages(
         fetchRequest.maxWait.toLong,
         fetchRequest.replicaId,
@@ -951,6 +979,9 @@ class KafkaApis(val requestChannel: RequestChannel,
         processResponseCallback,
         fetchRequest.isolationLevel,
         clientMetadata)
+      val end = System.nanoTime()
+      this.timeSpentFetching += (end - start)
+      this.timeSpentFetchHandler += (end - startFetch)
     }
   }
 

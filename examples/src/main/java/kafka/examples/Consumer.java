@@ -36,6 +36,9 @@ public class Consumer extends ShutdownableThread {
     private int messageRemaining;
     private final CountDownLatch latch;
 
+    private long totalTime = 0;
+    private long receivingTime = 0;
+
     public Consumer(final String topic,
                     final String groupId,
                     final Optional<String> instanceId,
@@ -71,14 +74,21 @@ public class Consumer extends ShutdownableThread {
 
     @Override
     public void doWork() {
+        long start = System.nanoTime();
         consumer.subscribe(Collections.singletonList(this.topic));
         ConsumerRecords<Integer, String> records = consumer.poll(Duration.ofSeconds(1));
-        for (ConsumerRecord<Integer, String> record : records) {
-            System.out.println(groupId + " received message : from partition " + record.partition() + ", (" + record.key() + ", " + record.value() + ") at offset " + record.offset());
-        }
+        long end = System.nanoTime();
+        long runtime = end - start;
+        this.totalTime += runtime;
+        if (records.count() > 0)
+            this.receivingTime += runtime;
+        // for (ConsumerRecord<Integer, String> record : records) {
+        //      do work
+        // }
         messageRemaining -= records.count();
         if (messageRemaining <= 0) {
             System.out.println(groupId + " finished reading " + numMessageToConsume + " messages");
+            System.out.println("Total time: " + this.totalTime + ", Receiving time: " + this.receivingTime);
             latch.countDown();
         }
     }
