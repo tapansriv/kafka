@@ -35,10 +35,10 @@ done
 echo $append
 echo $fetch
 
-basedir=/Users/Tapan/kafka
+basedir=/home/cc/kafka
 cd $basedir
-for i in "100000000 100" "1000000000 10" "10000000 1000"
-#for i in "100000000 100" "100000000 10" "100000000 1000"
+for i in "100000000 100" "1000000000 10" "10000000 1000" # same amount od data
+# for i in "100000000 100" "100000000 10"  "100000000 1000" # same num records
 do
     set -- $i
     echo $1 and $2
@@ -50,6 +50,6 @@ do
     bin/kafka-server-stop.sh
     sleep 10
     python3 examples/bin/max.py $1 $2 $append $fetch
-    sudo du -sh /tmp/kafka-logs
-    rm -r /tmp/kafka-logs
+    sudo du -sh /tmp/ramdisk/kafka-logs
+    rm -r /tmp/ramdisk/kafka-logs
 done

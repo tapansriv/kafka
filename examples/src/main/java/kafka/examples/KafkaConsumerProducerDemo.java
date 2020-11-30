@@ -46,7 +46,7 @@ public class KafkaConsumerProducerDemo {
         long runtime = end - start;
 
         try {
-            FileWriter fw = new FileWriter(new File("/Users/Tapan/kafka/data/total_runtime.txt"));
+            FileWriter fw = new FileWriter(new File("/home/cc/kafka/data/total_runtime.txt"));
             String outstr = runtime + "\n";
             fw.write(outstr);
             fw.flush();

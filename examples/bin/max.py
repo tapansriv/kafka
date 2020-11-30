@@ -6,7 +6,7 @@ append_flag = int(sys.argv[3])
 fetch_flag = int(sys.argv[4])
 
 
-basedir = "/Users/Tapan/kafka/data/"
+basedir = "/home/cc/kafka/data/"
 appending_file = basedir + "appending_time.txt"
 fetch_file = basedir + "fetch_time.txt"
 total_file = basedir + "total_runtime.txt"

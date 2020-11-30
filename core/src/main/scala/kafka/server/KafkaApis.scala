@@ -130,8 +130,8 @@ class KafkaApis(val requestChannel: RequestChannel,
   def close(): Unit = {
     alterAclsPurgatory.shutdown()
     info("Shutdown complete.")
-    val f1 = new PrintWriter(new File("/Users/Tapan/kafka/data/appending_time.txt"))
-    val f2 = new PrintWriter(new File("/Users/Tapan/kafka/data/fetch_time.txt"))
+    val f1 = new PrintWriter(new File("/home/cc/kafka/data/appending_time.txt"))
+    val f2 = new PrintWriter(new File("/home/cc/kafka/data/fetch_time.txt"))
     val append_str = this.timeSpentAppending.toString() + "," + this.timeSpentProducerHandler.toString() + "\n"
     val fetch_str =  this.timeSpentFetching.toString()  + "," + this.timeSpentFetchHandler.toString()    + "\n"
     f1.write(append_str)
